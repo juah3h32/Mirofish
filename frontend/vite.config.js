@@ -14,6 +14,7 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    allowedHosts: ['.onrender.com', 'localhost', '.vercel.app'],
     proxy: {
       '/api': {
         target: 'http://localhost:5001',
