@@ -41,7 +41,15 @@ def create_app(config_class=Config):
     
     # 启用CORS（orígenes configurables via CORS_ORIGINS, separados por coma）
     cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3002')
-    CORS(app, resources={r"/api/*": {"origins": cors_origins.split(',')}})
+    # En producción (Render detectado por PORT), permitir todos los orígenes si no se especifica CORS_ORIGINS
+    if os.environ.get('PORT') and not os.environ.get('CORS_ORIGINS'):
+        CORS(app, resources={r"/api/*": {"origins": "*"}})
+        if should_log_startup:
+            logger.info("CORS: Permitidos todos los orígenes (modo producción)")
+    else:
+        CORS(app, resources={r"/api/*": {"origins": cors_origins.split(',')}})
+        if should_log_startup:
+            logger.info(f"CORS: Orígenes permitidos: {cors_origins}")
     
     # 注册模拟进程清理函数（确保服务器关闭时终止所有模拟进程）
     from .services.simulation_runner import SimulationRunner
