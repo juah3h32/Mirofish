@@ -1,19 +1,19 @@
 """
 LLM客户端封装
-统一使用OpenAI格式调用
+使用 Anthropic Claude API
 """
 
 import json
 import re
 from typing import Optional, Dict, Any, List
-from openai import OpenAI
+from anthropic import Anthropic
 
 from ..config import Config
 
 
 class LLMClient:
-    """LLM客户端"""
-    
+    """LLM客户端 - Anthropic Claude API"""
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -23,15 +23,27 @@ class LLMClient:
         self.api_key = api_key or Config.LLM_API_KEY
         self.base_url = base_url or Config.LLM_BASE_URL
         self.model = model or Config.LLM_MODEL_NAME
-        
+
         if not self.api_key:
             raise ValueError("LLM_API_KEY 未配置")
-        
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
-    
+
+        kwargs = {"api_key": self.api_key}
+        if self.base_url:
+            kwargs["base_url"] = self.base_url
+        self.client = Anthropic(**kwargs)
+
+    def _split_messages(self, messages: List[Dict[str, str]]) -> tuple:
+        """Separa system message del resto. Retorna (system_text, chat_messages)."""
+        system_parts = []
+        chat_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system_parts.append(m["content"])
+            else:
+                chat_messages.append({"role": m["role"], "content": m["content"]})
+        system_text = "\n\n".join(system_parts) if system_parts else None
+        return system_text, chat_messages
+
     def chat(
         self,
         messages: List[Dict[str, str]],
@@ -41,32 +53,46 @@ class LLMClient:
     ) -> str:
         """
         发送聊天请求
-        
+
         Args:
             messages: 消息列表
             temperature: 温度参数
             max_tokens: 最大token数
             response_format: 响应格式（如JSON模式）
-            
+
         Returns:
             模型响应文本
         """
+        system_text, chat_messages = self._split_messages(messages)
+
+        if response_format and response_format.get("type") == "json_object":
+            json_instruction = "\nYou must respond with valid JSON only. Do not include any other text, markdown fences, or explanations."
+            system_text = (system_text or "") + json_instruction
+
         kwargs = {
             "model": self.model,
-            "messages": messages,
+            "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        
-        if response_format:
-            kwargs["response_format"] = response_format
-        
-        response = self.client.chat.completions.create(**kwargs)
-        content = response.choices[0].message.content
-        # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
+        if system_text:
+            kwargs["system"] = system_text
+
+        response = self.client.messages.create(**kwargs)
+
+        # Extraer texto de la respuesta
+        content = ""
+        for block in response.content:
+            if block.type == "text":
+                content += block.text
+
+        # Limpiar <think> tags si existen
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
-        return content
-    
+        # Limpiar markdown code blocks
+        content = re.sub(r'^```(?:json)?\s*\n?', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'\n?```\s*$', '', content)
+        return content.strip()
+
     def chat_json(
         self,
         messages: List[Dict[str, str]],
@@ -75,12 +101,12 @@ class LLMClient:
     ) -> Dict[str, Any]:
         """
         发送聊天请求并返回JSON
-        
+
         Args:
             messages: 消息列表
             temperature: 温度参数
             max_tokens: 最大token数
-            
+
         Returns:
             解析后的JSON对象
         """
@@ -90,14 +116,15 @@ class LLMClient:
             max_tokens=max_tokens,
             response_format={"type": "json_object"}
         )
-        # 清理markdown代码块标记
-        cleaned_response = response.strip()
-        cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
-        cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
-        cleaned_response = cleaned_response.strip()
 
         try:
-            return json.loads(cleaned_response)
+            return json.loads(response)
         except json.JSONDecodeError:
-            raise ValueError(f"LLM返回的JSON格式无效: {cleaned_response}")
-
+            # Intentar extraer JSON de la respuesta si hay texto alrededor
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group())
+                except json.JSONDecodeError:
+                    pass
+            raise ValueError(f"LLM返回的JSON格式无效: {response[:500]}")

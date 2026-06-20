@@ -15,7 +15,6 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from openai import OpenAI
 from zep_cloud.client import Zep
 
 from ..config import Config
@@ -186,16 +185,13 @@ class OasisProfileGenerator:
         zep_api_key: Optional[str] = None,
         graph_id: Optional[str] = None
     ):
-        self.api_key = api_key or Config.LLM_API_KEY
-        self.base_url = base_url or Config.LLM_BASE_URL
         self.model_name = model_name or Config.LLM_MODEL_NAME
-        
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY 未配置")
-        
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
+
+        from ..utils.llm_client import LLMClient
+        self.client = LLMClient(
+            api_key=api_key,
+            base_url=base_url,
+            model=self.model_name
         )
         
         # Zep客户端用于检索丰富上下文
@@ -527,8 +523,7 @@ class OasisProfileGenerator:
         
         for attempt in range(max_attempts):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
+                content = self.client.chat(
                     messages=[
                         {"role": "system", "content": self._get_system_prompt(is_individual)},
                         {"role": "user", "content": prompt}
@@ -537,14 +532,6 @@ class OasisProfileGenerator:
                     temperature=0.7 - (attempt * 0.1)  # 每次重试降低温度
                     # 不设置max_tokens，让LLM自由发挥
                 )
-                
-                content = response.choices[0].message.content
-                
-                # 检查是否被截断（finish_reason不是'stop'）
-                finish_reason = response.choices[0].finish_reason
-                if finish_reason == 'length':
-                    logger.warning(f"LLM输出被截断 (attempt {attempt+1}), 尝试修复...")
-                    content = self._fix_truncated_json(content)
                 
                 # 尝试解析JSON
                 try:
