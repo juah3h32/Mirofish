@@ -94,6 +94,29 @@
           </span>
         </div>
         
+        <!-- Botón borrar (aparece al hover) -->
+        <div class="card-delete-area" @click.stop>
+          <template v-if="deleteConfirmId === project.simulation_id">
+            <span class="card-delete-confirm-text">¿Borrar?</span>
+            <button class="card-delete-btn card-delete-btn--yes" @click="confirmDelete($event, project.simulation_id)">Sí</button>
+            <button class="card-delete-btn card-delete-btn--no" @click="cancelDelete($event)">No</button>
+          </template>
+          <template v-else>
+            <button
+              class="card-delete-btn card-delete-btn--icon"
+              :class="{ 'is-deleting': deletingId === project.simulation_id }"
+              @click="handleDeleteClick($event, project.simulation_id)"
+              title="Eliminar simulación"
+            >
+              <svg v-if="deletingId !== project.simulation_id" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+              <span v-else class="card-deleting-dot"></span>
+            </button>
+          </template>
+        </div>
+
         <!-- 底部装饰线 (hover时展开) -->
         <div class="card-bottom-line"></div>
       </div>
@@ -194,7 +217,7 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getSimulationHistory } from '../api/simulation'
+import { getSimulationHistory, deleteSimulation } from '../api/simulation'
 
 const router = useRouter()
 const route = useRoute()
@@ -207,6 +230,8 @@ const isExpanded = ref(false)
 const hoveringCard = ref(null)
 const historyContainer = ref(null)
 const selectedProject = ref(null)  // 当前选中的项目（用于弹窗）
+const deleteConfirmId = ref(null)  // ID de simulación pendiente de confirmar borrado
+const deletingId = ref(null)       // ID en proceso de borrado
 let observer = null
 let isAnimating = false  // 动画锁，防止闪烁
 let expandDebounceTimer = null  // 防抖定时器
@@ -437,6 +462,35 @@ const goToReport = () => {
 }
 
 // 加载历史项目
+const handleDeleteClick = (e, simulationId) => {
+  e.stopPropagation()
+  deleteConfirmId.value = simulationId
+}
+
+const cancelDelete = (e) => {
+  e?.stopPropagation()
+  deleteConfirmId.value = null
+}
+
+const confirmDelete = async (e, simulationId) => {
+  e.stopPropagation()
+  deletingId.value = simulationId
+  deleteConfirmId.value = null
+  try {
+    const res = await deleteSimulation(simulationId)
+    if (res.success || res.data?.success !== false) {
+      projects.value = projects.value.filter(p => p.simulation_id !== simulationId)
+      if (selectedProject.value?.simulation_id === simulationId) {
+        selectedProject.value = null
+      }
+    }
+  } catch (err) {
+    console.error('Error al eliminar simulación:', err)
+  } finally {
+    deletingId.value = null
+  }
+}
+
 const loadHistory = async () => {
   try {
     loading.value = true
@@ -968,6 +1022,78 @@ onUnmounted(() => {
 .project-card:hover .card-bottom-line {
   width: 100%;
 }
+
+/* ── Delete button ────────────────────────────────── */
+.card-delete-area {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 25;
+}
+
+.project-card:hover .card-delete-area {
+  opacity: 1;
+}
+
+.card-delete-btn {
+  background: rgba(30,30,34,0.85);
+  border: 1px solid #333;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 3px 7px;
+  line-height: 1.4;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-delete-btn--icon {
+  color: #888;
+  padding: 4px 6px;
+}
+.card-delete-btn--icon:hover {
+  background: rgba(192,57,43,0.15);
+  color: #C0392B;
+  border-color: #C0392B;
+}
+
+.card-delete-btn--yes {
+  color: #E74C3C;
+  border-color: #C0392B;
+}
+.card-delete-btn--yes:hover { background: rgba(192,57,43,0.2); }
+
+.card-delete-btn--no {
+  color: #AAA;
+}
+.card-delete-btn--no:hover { background: rgba(255,255,255,0.08); }
+
+.card-delete-confirm-text {
+  font-size: 10px;
+  color: #E74C3C;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.card-deleting-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #888;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* 空状态 */
 .empty-state, .loading-state {

@@ -1682,6 +1682,32 @@ def stop_simulation():
         }), 500
 
 
+@simulation_bp.route('/<simulation_id>', methods=['DELETE'])
+def delete_simulation(simulation_id: str):
+    """
+    Elimina permanentemente una simulación y todos sus datos.
+    Si la simulación está en ejecución, la detiene primero.
+    """
+    import shutil
+    try:
+        # Detener si está corriendo
+        try:
+            SimulationRunner.stop_simulation(simulation_id)
+        except Exception:
+            pass
+
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+        if not os.path.exists(sim_dir):
+            return jsonify({"success": False, "error": "Simulación no encontrada"}), 404
+
+        shutil.rmtree(sim_dir)
+        current_app.logger.info(f"Simulación eliminada: {simulation_id}")
+        return jsonify({"success": True, "simulation_id": simulation_id})
+    except Exception as e:
+        current_app.logger.error(f"Error al eliminar simulación {simulation_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Error interno del servidor"}), 500
+
+
 # ============== 实时状态监控接口 ==============
 
 @simulation_bp.route('/<simulation_id>/run-status', methods=['GET'])

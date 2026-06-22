@@ -91,7 +91,21 @@
       </div>
 
       <div class="action-controls">
-        <button 
+        <!-- Botón Cancelar predicción (visible solo cuando está corriendo) -->
+        <button
+          v-if="phase === 1"
+          class="action-btn cancel"
+          :disabled="isStopping"
+          @click="confirmStop"
+        >
+          <span v-if="isStopping" class="loading-spinner-small"></span>
+          <svg v-else viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+          </svg>
+          {{ isStopping ? 'Deteniendo...' : 'Cancelar predicción' }}
+        </button>
+
+        <button
           class="action-btn primary"
           :disabled="phase !== 2 || isGeneratingReport"
           @click="handleNextStep"
@@ -101,6 +115,30 @@
           <span v-if="!isGeneratingReport" class="arrow-icon">→</span>
         </button>
       </div>
+
+      <!-- Modal confirmación cancelar -->
+      <Teleport to="body">
+        <div v-if="showStopConfirm" class="stop-modal-overlay" @click.self="showStopConfirm = false">
+          <div class="stop-modal">
+            <div class="stop-modal-icon">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#E67E22" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <h3 class="stop-modal-title">¿Cancelar la predicción?</h3>
+            <p class="stop-modal-desc">La simulación se detendrá y podrás generar el reporte con los datos recolectados hasta ahora.</p>
+            <div class="stop-modal-actions">
+              <button class="stop-modal-btn stop-modal-btn--cancel" @click="showStopConfirm = false">
+                Continuar simulación
+              </button>
+              <button class="stop-modal-btn stop-modal-btn--confirm" @click="doStop">
+                Sí, cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
 
     <!-- Main Content: Dual Timeline -->
@@ -320,6 +358,7 @@ const isGeneratingReport = ref(false)
 const phase = ref(0) // 0: 未开始, 1: 运行中, 2: 已完成
 const isStarting = ref(false)
 const isStopping = ref(false)
+const showStopConfirm = ref(false)
 const startError = ref(null)
 const runStatus = ref({})
 const allActions = ref([]) // 所有动作（增量累积）
@@ -436,6 +475,9 @@ const doStartSimulation = async () => {
     isStarting.value = false
   }
 }
+
+const confirmStop = () => { showStopConfirm.value = true }
+const doStop = () => { showStopConfirm.value = false; handleStopSimulation() }
 
 // 停止模拟
 const handleStopSimulation = async () => {
@@ -900,6 +942,80 @@ onUnmounted(() => {
   opacity: 0.3;
   cursor: not-allowed;
 }
+
+.action-btn.cancel {
+  background: transparent;
+  color: #C0392B;
+  border: 1px solid #C0392B;
+}
+.action-btn.cancel:hover:not(:disabled) {
+  background: rgba(192, 57, 43, 0.08);
+}
+
+/* Stop confirm modal */
+.stop-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.stop-modal {
+  background: #1A1A1E;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 32px 28px 24px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.stop-modal-icon { margin-bottom: 4px; }
+.stop-modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #EEE;
+  text-align: center;
+}
+.stop-modal-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  line-height: 1.5;
+}
+.stop-modal-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+.stop-modal-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 7px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.stop-modal-btn--cancel {
+  background: #2A2A30;
+  color: #CCC;
+}
+.stop-modal-btn--cancel:hover { background: #333338; }
+.stop-modal-btn--confirm {
+  background: #C0392B;
+  color: #fff;
+}
+.stop-modal-btn--confirm:hover { background: #E74C3C; }
 
 /* --- Main Content Area --- */
 .main-content-area {
