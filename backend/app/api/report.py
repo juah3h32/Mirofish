@@ -399,41 +399,85 @@ def list_reports():
 def download_report(report_id: str):
     """
     下载报告（Markdown格式）
-    
+
     返回Markdown文件
     """
     try:
         report = ReportManager.get_report(report_id)
-        
+
         if not report:
             return jsonify({
                 "success": False,
                 "error": t('api.reportNotFound', id=report_id)
             }), 404
-        
+
         md_path = ReportManager._get_report_markdown_path(report_id)
-        
+
         if not os.path.exists(md_path):
             # 如果MD文件不存在，生成一个临时文件
             import tempfile
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
                 f.write(report.markdown_content)
                 temp_path = f.name
-            
+
             return send_file(
                 temp_path,
                 as_attachment=True,
                 download_name=f"{report_id}.md"
             )
-        
+
         return send_file(
             md_path,
             as_attachment=True,
             download_name=f"{report_id}.md"
         )
-        
+
     except Exception as e:
         logger.error(f"下载报告失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@report_bp.route('/<report_id>/download/pdf', methods=['GET'])
+def download_report_pdf(report_id: str):
+    """
+    下载报告（PDF格式 - Resumen Ejecutivo）
+
+    返回PDF profesional con:
+    - Portada
+    - Resumen de hallazgos
+    - Métricas clave
+    """
+    try:
+        report = ReportManager.get_report(report_id)
+
+        if not report:
+            return jsonify({
+                "success": False,
+                "error": t('api.reportNotFound', id=report_id)
+            }), 404
+
+        # Verificar si ya existe el PDF generado
+        pdf_dir = os.path.join(Config.UPLOAD_FOLDER, 'reports', report_id)
+        pdf_path = os.path.join(pdf_dir, 'executive_summary.pdf')
+
+        if not os.path.exists(pdf_path):
+            # Generar PDF
+            from ..services.pdf_generator import generate_report_pdf
+            pdf_path = generate_report_pdf(report.to_dict(), output_path=pdf_path)
+
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=f"mirofish_informe_{report_id}.pdf",
+            mimetype='application/pdf'
+        )
+
+    except Exception as e:
+        logger.error(f"Descargar PDF falló: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),

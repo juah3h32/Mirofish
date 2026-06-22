@@ -1729,12 +1729,23 @@ class ReportAgent:
                 progress_callback("completed", 100, t('progress.reportComplete'))
             
             logger.info(t('report.reportGenDone', reportId=report_id))
-            
+
+            # Generar PDF ejecutivo automáticamente
+            try:
+                from .pdf_generator import generate_report_pdf
+                pdf_dir = os.path.join(Config.UPLOAD_FOLDER, 'reports', report_id)
+                os.makedirs(pdf_dir, exist_ok=True)
+                pdf_path = os.path.join(pdf_dir, 'executive_summary.pdf')
+                generate_report_pdf(report.to_dict(), output_path=pdf_path)
+                logger.info(f"PDF ejecutivo generado: {pdf_path}")
+            except Exception as pdf_err:
+                logger.warning(f"No se pudo generar PDF ejecutivo: {pdf_err}")
+
             # 关闭控制台日志记录器
             if self.console_logger:
                 self.console_logger.close()
                 self.console_logger = None
-            
+
             return report
             
         except Exception as e:

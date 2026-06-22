@@ -49,3 +49,20 @@ export const getReport = (reportId) => {
 export const chatWithReport = (data) => {
   return requestWithRetry(() => service.post('/api/report/chat', data), 3, 1000)
 }
+
+/**
+ * Obtener URL de descarga del PDF ejecutivo
+ * @param {string} reportId
+ */
+export const getPdfDownloadUrl = (reportId) => {
+  return `${service.defaults.baseURL}/api/report/${reportId}/download/pdf`
+}
+
+/**
+ * Descargar PDF del reporte
+ * @param {string} reportId
+ */
+export const downloadReportPdf = (reportId) => {
+  const url = getPdfDownloadUrl(reportId)
+  window.open(url, '_blank')
+}

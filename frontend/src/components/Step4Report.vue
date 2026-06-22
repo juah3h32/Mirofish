@@ -128,13 +128,23 @@
           </div>
 
           <!-- Next Step Button - 在完成后显示 -->
-          <button v-if="isComplete" class="next-step-btn" @click="goToInteraction">
-            <span>{{ $t('step4.goToInteraction') }}</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
-          </button>
+          <div v-if="isComplete" class="complete-actions">
+            <button class="pdf-download-btn" @click="downloadPdf">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Descargar PDF</span>
+            </button>
+            <button class="next-step-btn" @click="goToInteraction">
+              <span>{{ $t('step4.goToInteraction') }}</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
 
           <div class="workflow-divider"></div>
         </div>
@@ -393,7 +403,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, h, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getAgentLog, getConsoleLog } from '../api/report'
+import { getAgentLog, getConsoleLog, downloadReportPdf } from '../api/report'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -410,6 +420,12 @@ const emit = defineEmits(['add-log', 'update-status'])
 const goToInteraction = () => {
   if (props.reportId) {
     router.push({ name: 'Interaction', params: { reportId: props.reportId } })
+  }
+}
+
+const downloadPdf = () => {
+  if (props.reportId) {
+    downloadReportPdf(props.reportId)
   }
 }
 
@@ -3430,6 +3446,44 @@ watch(() => props.reportId, (newId) => {
 
 .next-step-btn:hover svg {
   transform: translateX(4px);
+}
+
+.complete-actions {
+  display: flex;
+  gap: 10px;
+  width: calc(100% - 40px);
+  margin: 4px 20px 0 20px;
+}
+
+.pdf-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: #F26014;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pdf-download-btn:hover {
+  background: #E05510;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(242, 96, 20, 0.3);
+}
+
+.pdf-download-btn svg {
+  flex-shrink: 0;
+}
+
+.next-step-btn {
+  flex: 1;
 }
 
 /* Workflow Empty */
