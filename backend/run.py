@@ -24,15 +24,14 @@ from app.config import Config
 
 def main():
     """主函数"""
-    # 验证配置
+    # 验证配置 (no bloquear el inicio — solo advertir)
     errors = Config.validate()
     if errors:
-        print("配置错误:")
+        print("⚠️  Advertencia: configuración incompleta:")
         for err in errors:
             print(f"  - {err}")
-        print("\n请检查 .env 文件中的配置")
-        sys.exit(1)
-    
+        print("   La app iniciará pero algunas funciones no estarán disponibles.\n")
+
     # 创建应用
     app = create_app()
     
