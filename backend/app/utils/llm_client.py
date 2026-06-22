@@ -21,15 +21,20 @@ class LLMClient:
         model: Optional[str] = None
     ):
         self.api_key = api_key or Config.LLM_API_KEY
-        self.base_url = base_url or Config.LLM_BASE_URL
         self.model = model or Config.LLM_MODEL_NAME
 
         if not self.api_key:
             raise ValueError("LLM_API_KEY 未配置")
 
+        # The Anthropic SDK appends /v1/<endpoint> to the base_url.
+        # If the configured URL already ends with /v1, strip it to avoid /v1/v1/messages → 404.
+        raw_base = base_url or Config.LLM_BASE_URL or ''
+        if raw_base.endswith('/v1') or raw_base.endswith('/v1/'):
+            raw_base = raw_base.rstrip('/').removesuffix('/v1')
+        # Only pass base_url if it differs from Anthropic's default
         kwargs = {"api_key": self.api_key}
-        if self.base_url:
-            kwargs["base_url"] = self.base_url
+        if raw_base and raw_base != 'https://api.anthropic.com':
+            kwargs["base_url"] = raw_base
         self.client = Anthropic(**kwargs)
 
     def _split_messages(self, messages: List[Dict[str, str]]) -> tuple:
